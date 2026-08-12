@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>היומן שלי</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <meta name="theme-color" content="#4a3b32">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="היומן שלי">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+</head>
+<body>
+    <div id="auth-overlay" class="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="glass-panel max-w-sm w-full p-6 text-center bg-white rounded-2xl shadow-xl">
+    <h2 class="text-2xl font-bold mb-2">התחברות ליומן</h2>
+    <p class="text-xs text-stone-500 mb-4">התחבר כדי לסנכרן את הנתונים בין הטלפון למחשב</p>
+    <form id="auth-form" class="space-y-3">
+      <input type="email" id="auth-email" placeholder="אימייל" required class="w-full p-2.5 rounded-xl border border-stone-200 text-sm">
+      <input type="password" id="auth-password" placeholder="סיסמה" required class="w-full p-2.5 rounded-xl border border-stone-200 text-sm">
+      <button type="submit" class="btn-primary w-full py-2.5 rounded-xl font-bold text-sm">התחבר / הירשם</button>
+    </form>
+  </div>
+</div>
+    <!-- תפריט עליון (דסקטופ) -->
+    <header class="glass-panel mx-4 mt-4 p-4 flex justify-between items-center sticky top-4 z-40">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-book-open text-2xl text-[var(--primary-text)]"></i>
+            <h1 class="text-xl md:text-2xl font-bold m-0 tracking-tight">היומן שלי</h1>
+        </div>
+        
+        <nav class="hidden md:flex gap-6 text-sm items-center">
+            <button class="nav-item active pb-1 cursor-pointer" onclick="switchView('threedays')">3 הימים הקרובים</button>
+            <button class="nav-item pb-1 cursor-pointer" onclick="switchView('monthly')">חודשי</button>
+            <button class="nav-item pb-1 cursor-pointer" onclick="switchView('weekly')">שבועי</button>
+            <button class="nav-item pb-1 cursor-pointer" onclick="switchView('courses')">קורסים</button>
+            <button class="nav-item pb-1 cursor-pointer" onclick="switchView('pomodoro')">פומודורו</button>
+        </nav>
+
+        <button onclick="openAddModal()" class="btn-primary px-5 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+            <i class="fas fa-plus"></i> הוספה
+        </button>
+    </header>
+
+    <!-- תפריט תחתון (מובייל) -->
+    <nav class="md:hidden glass-panel fixed bottom-0 left-0 w-full p-2 flex justify-around items-center z-40 rounded-t-2xl rounded-b-none border-t border-[var(--border-color)] pb-6">
+        <button class="flex flex-col items-center gap-1 nav-mobile active text-[var(--primary-text)] font-bold" onclick="switchView('threedays', this)">
+            <i class="fas fa-layer-group text-lg"></i>
+            <span class="text-[10px]">3 ימים</span>
+        </button>
+        <button class="flex flex-col items-center gap-1 nav-mobile text-[var(--secondary-text)]" onclick="switchView('weekly', this)">
+            <i class="fas fa-calendar-week text-lg"></i>
+            <span class="text-[10px]">שבוע</span>
+        </button>
+        <button class="flex flex-col items-center gap-1 nav-mobile text-[var(--secondary-text)]" onclick="switchView('courses', this)">
+            <i class="fas fa-graduation-cap text-lg"></i>
+            <span class="text-[10px]">קורסים</span>
+        </button>
+        <button class="flex flex-col items-center gap-1 nav-mobile text-[var(--secondary-text)]" onclick="switchView('pomodoro', this)">
+            <i class="fas fa-stopwatch text-lg"></i>
+            <span class="text-[10px]">מיקוד</span>
+        </button>
+    </nav>
+
+    <!-- תוכן ראשי -->
+    <main class="flex-1 p-4 pb-28 md:pb-8 max-w-6xl mx-auto w-full relative">
+        
+        <!-- ================= תצוגה: 3 הימים הקרובים ================= -->
+        <section id="view-threedays" class="block h-full animate-fade-in">
+            <div class="mb-6 flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold">3 הימים הקרובים</h2>
+                    <p class="text-[var(--secondary-text)] text-sm mt-1">כל מה שצריך לעשות, מסודר לפי קורס</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="threedays-grid">
+                <!-- Days injected via JS -->
+            </div>
+            
+            <div id="nearest-exam-section" class="mt-8 hidden">
+                <h3 class="font-bold text-lg mb-3 flex items-center gap-2">
+                    <i class="fas fa-clipboard-check text-[var(--primary-text)]"></i>
+                    המבחן הקרוב
+                </h3>
+                <div id="nearest-exam-card"></div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-file-alt text-[var(--accent-color)]"></i> עבודות קרובות להגשה</h3>
+                <div id="upcoming-assignments-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Assignments injected via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= תצוגה: לוח חודשי ================= -->
+        <section id="view-monthly" class="hidden h-full animate-fade-in">
+            <div class="glass-panel p-4 md:p-6 mb-6 flex justify-between items-center">
+                <button onclick="changeMonth(-1)" class="p-2 hover:bg-[var(--bg-color)] rounded-full transition"><i class="fas fa-chevron-right"></i></button>
+                <h2 id="month-title" class="text-2xl font-bold"></h2>
+                <button onclick="changeMonth(1)" class="p-2 hover:bg-[var(--bg-color)] rounded-full transition"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="glass-panel p-4 overflow-x-auto hide-scroll">
+                <div class="min-w-[700px]">
+                    <div class="grid grid-cols-7 gap-2 mb-3 text-center font-bold text-sm text-[var(--secondary-text)]">
+                        <div>ראשון</div><div>שני</div><div>שלישי</div><div>רביעי</div><div>חמישי</div><div>שישי</div><div>שבת</div>
+                    </div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2 auto-rows-fr"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= תצוגה: לוח שבועי ================= -->
+        <section id="view-weekly" class="hidden h-full animate-fade-in">
+             <div class="glass-panel p-4 md:p-6 mb-6 flex justify-between items-center">
+                <button onclick="changeWeek(-1)" class="p-2 hover:bg-[var(--bg-color)] rounded-full transition"><i class="fas fa-chevron-right"></i></button>
+                <h2 id="week-title" class="text-xl md:text-2xl font-bold"></h2>
+                <button onclick="changeWeek(1)" class="p-2 hover:bg-[var(--bg-color)] rounded-full transition"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="overflow-x-auto hide-scroll">
+                <div class="min-w-[900px] md:min-w-0 grid grid-cols-7 gap-3 md:gap-4" id="weekly-grid"></div>
+            </div>
+        </section>
+
+        <!-- ================= תצוגה: קורסים ================= -->
+        <section id="view-courses" class="hidden h-full animate-fade-in">
+            <div id="courses-main-page">
+                <div class="glass-panel p-6 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold">הקורסים שלי</h2>
+                        <p class="text-sm text-[var(--secondary-text)] mt-1">הוסף, ערוך או מחק קורסים ונהל את כל המשימות והעבודות שלהם.</p>
+                    </div>
+                    <button type="button" onclick="openCourseModal()" class="btn-primary px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2">
+                        <i class="fas fa-plus"></i> קורס חדש
+                    </button>
+                </div>
+                <div id="courses-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5"></div>
+            </div>
+
+            <!-- דאשבורד קורס יחיד -->
+            <div id="course-dashboard" class="hidden">
+                <button onclick="closeCourseDashboard()" class="mb-4 text-[var(--secondary-text)] hover:text-[var(--primary-text)] flex items-center gap-2 font-medium transition">
+                    <i class="fas fa-arrow-right"></i> חזור לקורסים
+                </button>
+                <div id="course-dashboard-header" class="glass-panel p-6 mb-6 border-t-4">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div>
+                            <h2 id="dashboard-course-title" class="text-3xl font-bold mb-2"></h2>
+                            <div id="dashboard-course-stats" class="text-[var(--secondary-text)] flex gap-4 text-sm font-medium"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="dashboard-edit-course-btn" class="px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm hover:bg-gray-50 transition">
+                                <i class="fas fa-pen ml-1"></i> ערוך קורס
+                            </button>
+                            <button id="dashboard-delete-course-btn" class="px-3 py-2 rounded-lg border border-red-100 text-red-500 text-sm hover:bg-red-50 transition">
+                                <i class="fas fa-trash ml-1"></i> מחק קורס
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-xl">משימות</h3>
+                            <button onclick="openAddModal('task', currentDashboardCourseId)" class="text-sm bg-white border border-[var(--border-color)] px-3 py-1 rounded-lg hover:bg-gray-50 transition">+ הוספה</button>
+                        </div>
+                        <div id="dashboard-tasks" class="space-y-3"></div>
+                    </div>
+                    <div>
+                         <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-xl">עבודות להגשה</h3>
+                            <button onclick="openAddModal('assignment', currentDashboardCourseId)" class="text-sm bg-white border border-[var(--border-color)] px-3 py-1 rounded-lg hover:bg-gray-50 transition">+ הוספה</button>
+                        </div>
+                        <div id="dashboard-assignments" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <div class="mt-7">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-xl">מבחנים</h3>
+                            <p class="text-xs text-[var(--secondary-text)] mt-1">מבחן אמצע, מבחן סופי ומועדי ב לפי הצורך</p>
+                        </div>
+                        <button onclick="openExamModal(null, currentDashboardCourseId)" class="btn-primary px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+                            <i class="fas fa-plus"></i> הוסף מבחן
+                        </button>
+                    </div>
+                    <div id="dashboard-exams" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                    <div id="dashboard-no-exams" class="hidden text-sm text-[var(--secondary-text)] bg-white border border-dashed border-[var(--border-color)] rounded-xl p-5 text-center">
+                        עדיין לא הוגדרו מבחנים לקורס זה.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= תצוגה: פומודורו ================= -->
+        <section id="view-pomodoro" class="hidden h-full animate-fade-in flex flex-col md:flex-row gap-6 items-start">
+            
+            <!-- אזור הטיימר -->
+            <div class="glass-panel p-8 text-center w-full md:w-2/3 mx-auto relative overflow-hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-[var(--primary-text)]">זמן ריכוז</h2>
+                    <p class="text-[var(--secondary-text)] mt-1" id="pomodoro-status-text">מוכן לסשן פתרון, תרגול או חזרה?</p>
+                </div>
+                
+                <!-- בחירת קורס ומשימה לפני התחלה -->
+                <div id="pomo-selectors" class="max-w-xs mx-auto mb-6 space-y-3">
+                    <select id="pomo-course-select" onchange="updatePomoTasks()" class="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-color)] text-sm focus:outline-none">
+                        <option value="">בחר קורס ללמידה (אופציונלי)</option>
+                    </select>
+                    <select id="pomo-task-select" class="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-color)] text-sm focus:outline-none hidden">
+                        <option value="">ללא משימה ספציפית</option>
+                    </select>
+                </div>
+
+                <div class="timer-circle mb-8 relative" id="timer-circle-element">
+                    <div class="text-6xl font-bold text-[var(--primary-text)] font-mono tracking-tighter" id="pomodoro-timer">25:00</div>
+                    
+                    <!-- מידע בזמן ריצה -->
+                    <div id="pomo-running-info" class="absolute bottom-10 w-full text-center hidden">
+                         <div id="pomo-running-course" class="text-sm font-bold text-[var(--primary-text)] truncate px-4"></div>
+                         <div id="pomo-running-task" class="text-xs text-[var(--secondary-text)] truncate px-4"></div>
+                    </div>
+                </div>
+                
+                <!-- פקדים -->
+                <div class="flex justify-center gap-4 mb-6 h-14">
+                    <button onclick="togglePomodoro()" id="pomodoro-toggle-btn" class="btn-primary w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-md">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button onclick="stopPomodoro()" id="pomodoro-stop-btn" class="bg-gray-100 text-[var(--primary-text)] hover:bg-gray-200 w-14 h-14 rounded-full flex items-center justify-center text-lg shadow-sm hidden">
+                        <i class="fas fa-square"></i>
+                    </button>
+                    <button onclick="resetPomodoro()" id="pomodoro-reset-btn" class="bg-gray-100 text-[var(--primary-text)] hover:bg-gray-200 w-14 h-14 rounded-full flex items-center justify-center text-lg shadow-sm">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+
+                <!-- סיום סשן נעים -->
+                <div id="pomo-finished-dialog" class="hidden mb-6 p-4 bg-[var(--bg-color)] rounded-xl border border-[var(--border-color)]">
+                    <h3 class="font-bold text-lg mb-2">סיימת סשן לימוד! 🎉</h3>
+                    <div class="flex flex-wrap justify-center gap-2">
+                        <button onclick="setPomoMode('shortBreak')" class="bg-[var(--success-color)] text-white px-4 py-2 rounded-lg text-sm">הפסקה קצרה</button>
+                        <button onclick="setPomoMode('longBreak')" class="bg-white border border-[var(--success-color)] text-[var(--success-color)] px-4 py-2 rounded-lg text-sm">הפסקה ארוכה</button>
+                        <button onclick="setPomoMode('work', 25)" class="btn-primary px-4 py-2 rounded-lg text-sm">סשן נוסף</button>
+                    </div>
+                </div>
+
+                <!-- אפשרויות זמנים (מוסתר בזמן ריצה) -->
+                <div id="pomo-time-options" class="flex flex-col items-center">
+                    <div class="flex flex-wrap justify-center gap-2 text-xs mb-3">
+                        <button onclick="setPomoMode('work', 25)" class="pomo-mode-btn bg-[var(--primary-text)] text-white px-3 py-1.5 rounded-full">25 דק'</button>
+                        <button onclick="setPomoMode('work', 45)" class="pomo-mode-btn bg-white border border-[var(--border-color)] px-3 py-1.5 rounded-full">45 דק'</button>
+                        <button onclick="setPomoMode('work', 60)" class="pomo-mode-btn bg-white border border-[var(--border-color)] px-3 py-1.5 rounded-full">60 דק'</button>
+                        <button onclick="setPomoMode('work', 90)" class="pomo-mode-btn bg-white border border-[var(--border-color)] px-3 py-1.5 rounded-full">90 דק'</button>
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-2 text-xs mb-3">
+                         <button onclick="setPomoMode('shortBreak', 5)" class="pomo-mode-btn bg-white border border-[var(--border-color)] px-3 py-1.5 rounded-full">הפסקה קצרה (5)</button>
+                         <button onclick="setPomoMode('longBreak', 15)" class="pomo-mode-btn bg-white border border-[var(--border-color)] px-3 py-1.5 rounded-full">הפסקה ארוכה (15)</button>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="text-sm font-medium">מותאם אישית:</span>
+                        <input type="number" id="pomo-custom-min" placeholder="דק'" min="1" max="180" class="w-16 p-1 text-center border border-[var(--border-color)] rounded-lg text-sm focus:outline-none">
+                        <button onclick="setCustomPomo()" class="btn-accent px-3 py-1 rounded-lg text-sm">החל</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- סטטיסטיקות פומודורו -->
+            <div class="w-full md:w-1/3 flex flex-col gap-4">
+                <div class="glass-panel p-5">
+                    <h3 class="font-bold text-lg border-b border-[var(--border-color)] pb-2 mb-3">היום</h3>
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-[var(--secondary-text)] text-sm">זמן לימוד כולל</span>
+                        <span class="font-bold text-xl" id="stat-today-time">0 דק'</span>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <span class="text-[var(--secondary-text)] text-sm">סשנים שהושלמו</span>
+                        <span class="font-bold text-lg" id="stat-today-sessions">0</span>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 flex-1">
+                    <h3 class="font-bold text-lg border-b border-[var(--border-color)] pb-2 mb-3">סיכום שבועי</h3>
+                    <div class="flex justify-between items-end mb-4">
+                        <span class="text-[var(--secondary-text)] text-sm">סה"כ השבוע</span>
+                        <span class="font-bold text-xl" id="stat-week-time">0 דק'</span>
+                    </div>
+                    <div id="stat-course-breakdown" class="space-y-2 mt-4 text-sm">
+                        <!-- יוזרק JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ================= מודאל קורס ================= -->
+    <div id="course-modal" class="modal">
+        <div class="glass-panel w-full max-w-md p-0 relative overflow-hidden">
+            <div class="flex items-center justify-between p-5 border-b border-[var(--border-color)] bg-[var(--bg-color)]">
+                <div>
+                    <h3 id="course-modal-title" class="font-bold text-xl">קורס חדש</h3>
+                    <p class="text-xs text-[var(--secondary-text)] mt-1">אפשר לשנות שם וצבע בכל שלב.</p>
+                </div>
+                <button type="button" onclick="closeCourseModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 text-[var(--secondary-text)]">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="course-form" class="p-6 space-y-5">
+                <input type="hidden" id="course-edit-id">
+
+                <div>
+                    <label class="block text-sm font-semibold mb-1">שם הקורס</label>
+                    <input type="text" id="course-name-input" required
+                           placeholder="לדוג' אותות ומערכות"
+                           class="w-full p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-color)] focus:outline-none focus:border-[var(--primary-text)]">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">צבע הקורס</label>
+                    <div id="course-color-options" class="flex flex-wrap gap-2"></div>
+                    <input type="hidden" id="course-color-input">
+                </div>
+
+                <div id="course-delete-warning" class="hidden p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-xs leading-relaxed">
+                    מחיקת קורס לא תמחק אוטומטית את המשימות והעבודות שלו. הן יעברו ל"ללא שיוך לקורס".
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-[var(--border-color)]">
+                    <button type="button" id="course-modal-delete-btn" onclick="deleteCourseFromModal()" class="hidden text-red-500 text-sm font-medium hover:underline">
+                        <i class="fas fa-trash ml-1"></i> מחק קורס
+                    </button>
+                    <div class="flex gap-2 mr-auto">
+                        <button type="button" onclick="closeCourseModal()" class="px-4 py-2 rounded-xl text-[var(--secondary-text)] hover:bg-gray-100">ביטול</button>
+                        <button type="submit" class="btn-primary px-6 py-2 rounded-xl font-bold">שמור</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= מודאל מבחן ================= -->
+    <div id="exam-modal" class="modal">
+        <div class="glass-panel w-full max-w-md p-0 relative overflow-hidden">
+            <div class="flex items-center justify-between p-5 border-b border-[var(--border-color)] bg-[var(--bg-color)]">
+                <div>
+                    <h3 id="exam-modal-title" class="font-bold text-xl">מבחן חדש</h3>
+                    <p class="text-xs text-[var(--secondary-text)] mt-1">המבחן יקבל אוטומטית את צבע הקורס, בהדגשה חזקה יותר.</p>
+                </div>
+                <button type="button" onclick="closeExamModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 text-[var(--secondary-text)]">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="exam-form" class="p-6 space-y-5">
+                <input type="hidden" id="exam-edit-id">
+
+                <div>
+                    <label class="block text-sm font-semibold mb-1">קורס</label>
+                    <select id="exam-course" required class="w-full p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-color)] focus:outline-none focus:border-[var(--primary-text)]"></select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">סוג המבחן</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exam-type" value="midterm" checked class="peer sr-only">
+                            <div class="p-3 text-center rounded-xl border-2 border-[var(--border-color)] peer-checked:border-[var(--primary-text)] peer-checked:bg-[var(--bg-color)] transition">
+                                <i class="fas fa-clipboard-list ml-1"></i> מבחן אמצע
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exam-type" value="final" class="peer sr-only">
+                            <div class="p-3 text-center rounded-xl border-2 border-[var(--border-color)] peer-checked:border-[var(--primary-text)] peer-checked:bg-[var(--bg-color)] transition">
+                                <i class="fas fa-award ml-1"></i> מבחן סופי
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">מועד</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exam-session" value="A" checked class="peer sr-only">
+                            <div class="p-2.5 text-center rounded-xl border border-[var(--border-color)] peer-checked:border-[var(--primary-text)] peer-checked:font-bold transition">מועד א</div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exam-session" value="B" class="peer sr-only">
+                            <div class="p-2.5 text-center rounded-xl border border-[var(--border-color)] peer-checked:border-[var(--primary-text)] peer-checked:font-bold transition">מועד ב</div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-1">תאריך</label>
+                    <input type="date" id="exam-date" required class="w-full p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-color)] focus:outline-none focus:border-[var(--primary-text)]">
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-[var(--border-color)]">
+                    <button type="button" id="exam-delete-btn" onclick="deleteCurrentExam()" class="hidden text-red-500 text-sm font-medium hover:underline">
+                        <i class="fas fa-trash ml-1"></i> מחק מבחן
+                    </button>
+                    <div class="flex gap-2 mr-auto">
+                        <button type="button" onclick="closeExamModal()" class="px-4 py-2 rounded-xl text-[var(--secondary-text)] hover:bg-gray-100">ביטול</button>
+                        <button type="submit" class="btn-primary px-6 py-2 rounded-xl font-bold">שמור</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= מודאל הוספה / עריכה ================= -->
+    <div id="item-modal" class="modal">
+        <div class="glass-panel w-full max-w-md p-0 relative overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <!-- Modal Header / Tabs -->
+            <div class="flex border-b border-[var(--border-color)] bg-[var(--bg-color)]">
+                <button id="tab-task" onclick="setModalTab('task')" class="flex-1 py-4 font-bold text-center border-b-2 border-[var(--primary-text)] text-[var(--primary-text)] transition">
+                    <i class="fas fa-check-square ml-1"></i> משימה
+                </button>
+                <button id="tab-assignment" onclick="setModalTab('assignment')" class="flex-1 py-4 font-bold text-center border-b-2 border-transparent text-[var(--secondary-text)] hover:text-[var(--primary-text)] transition">
+                    <i class="fas fa-file-alt ml-1"></i> עבודה להגשה
+                </button>
+                <button onclick="closeModal()" class="absolute top-3 left-4 text-[var(--secondary-text)] hover:text-black w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <form id="item-form" class="space-y-4">
+                    <input type="hidden" id="item-id">
+                    <input type="hidden" id="item-type" value="task"> <!-- 'task' or 'assignment' -->
+                    
+                    <div>
+                        <label class="block text-sm font-semibold mb-1" id="label-title">שם המשימה</label>
+                        <input type="text" id="item-title" required class="w-full p-2.5 rounded-xl border border-[var(--border-color)] focus:outline-none focus:border-[var(--primary-text)] bg-[var(--bg-color)]">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">קורס</label>
+                        <select id="item-course" class="w-full p-2.5 rounded-xl border border-[var(--border-color)] focus:outline-none focus:border-[var(--primary-text)] bg-[var(--bg-color)]">
+                            <option value="">ללא שיוך לקורס</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1" id="label-date">Deadline (עד תאריך)</label>
+                        <input type="date" id="item-date" required class="w-full p-2.5 rounded-xl border border-[var(--border-color)] focus:outline-none focus:border-[var(--primary-text)] bg-[var(--bg-color)]">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">הערות (אופציונלי)</label>
+                        <textarea id="item-notes" rows="2" class="w-full p-2.5 rounded-xl border border-[var(--border-color)] focus:outline-none focus:border-[var(--primary-text)] bg-[var(--bg-color)] resize-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-4 mt-2 border-t border-[var(--border-color)]">
+                        <button type="button" id="btn-delete-item" onclick="deleteCurrentItem()" class="hidden text-sm text-[var(--late-color)] hover:underline font-medium"><i class="fas fa-trash"></i> מחק</button>
+                        <div class="flex gap-2 mr-auto">
+                            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-[var(--secondary-text)] hover:bg-gray-100 transition font-medium">ביטול</button>
+                            <button type="submit" class="btn-primary px-6 py-2 rounded-xl font-bold">שמור</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>

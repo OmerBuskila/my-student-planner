@@ -1,6 +1,41 @@
+// --- Supabase Config ---
 const SUPABASE_URL = 'https://krjzpnnrccdqzielykhz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyanpwbm5yY2NkcXppZWx5a2h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MjE0OTYsImV4cCI6MjEwMjA5NzQ5Nn0.cd2N3pJdUO_NkUHV0NigC8P4mNRXHUn9U11FQijKLTo';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+
+// --- Authentication Logic ---
+window.addEventListener('DOMContentLoaded', async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        document.getElementById('auth-overlay')?.classList.add('hidden');
+        await loadAllDataFromCloud();
+    }
+});
+
+document.getElementById('auth-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+
+    let { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+        const signUp = await supabaseClient.auth.signUp({ email, password });
+        data = signUp.data;
+        error = signUp.error;
+    }
+
+    if (error) {
+        alert('שגיאה: ' + error.message);
+    } else if (data?.user) {
+        currentUser = data.user;
+        document.getElementById('auth-overlay')?.classList.add('hidden');
+        await loadAllDataFromCloud();
+    }
+});
 // --- State Management ---
         const PASTEL_COLORS = [
             '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF', 
